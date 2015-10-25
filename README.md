@@ -1,6 +1,6 @@
-# PTT - Page Transform Tree - logical component tree used to render document pages in various formats
+# PTT - Page Transform Tree
 
-This documents is a full specification of the PTT document format.
+This documents is a full specification of the PTT document format. PTT is a simple JSON describing the logical component tree used to render document pages in various formats (HTML, PDF,...) and sizes (A4,A3, Letter,...).
 
 ## <a name="PTT">Page Transform Tree</a>
 
