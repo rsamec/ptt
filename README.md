@@ -32,9 +32,9 @@ There is an minimal 'Hello world' example. The PTT consists of one container and
  "elementName": "PTTv1",
  "containers": [
     {
-     "name": "container",
+     "name": "My first container",
      "elementName": "Container",
-     "style": { "top": 0, "left": 0, "height": 200, "width": 740, "position": "relative" }
+     "style": { "top": 0, "left": 0, "height": 200, "width": 740, "position": "relative" },
      "boxes": [{
         "name": "My first text",
         "elementName": "TextContent",
@@ -42,7 +42,7 @@ There is an minimal 'Hello world' example. The PTT consists of one container and
         "props":{
              "content": "Hello world"
             }
-        }],
+        }]
     }]
 }
 ```
@@ -83,23 +83,29 @@ PTT is simple JSON. You can extend PTT document with any properties other than s
 ## PTT reference usage
 
 The __content applying__ is not the part of the PPT format specification. This section is intended for PTT rendering implementers to guide them when solving layouting and positioning of components.
+It is an reference example how to specify PTT rendering. It describes rules how to render content based on PTT document definition. The PTT implementers will define their own layout components and rendering rules acoordings their specific needs.
 
-PTT document layout is mainly specified by the type of containers used in the definition (Container,BackgroundContainer, Page,Grid,Row,Cell, etc.). 
+PTT document layout is mainly specified by the type of containers used in the definition (Container,BackgroundContainer,Page,Grid,Row,Cell,Table etc.).
 
-We can distinguish containers based on reponsivness (adjusting components dimensions and positions)
+Typically we can distinguish containers based on responsivness (adjusting components dimensions and positions)
 
 +  responsive (Grid,Row,Cell)
 +  static - (Container, Page, BackgroundContainer) - they retain its dimensions and positions
 
-We can distinguish containers based on whetever providing visual effects
+We can distinguish containers based on whatever visual effects provide
 
-+ logical (Container, Page, Row) - has no visual effect (only simple layouting) - only to grouping logically related components
-+ visual - has visual effect other than simple layouting as background, border, gutters, etc. (BackgroundContainer, Cell, Grid)
++ logical (Container, Page) - has no visual effect
++ visual - simple layouting only (Row) - only to grouping logically related components
++ visual - other visual effect other than simple layouting as background, border, gutters, etc. (BackgroundContainer, Cell, Grid, Table)
 
+### Containers components
 
-The default container element is __Container__ and belongs to  __static__ and __logical__ containers.
+The default layout component is __Container__ and belongs to  __static__ and __logical__ containers.
+The default responsive component is __Grid__ and belongs to __responsive__ and __visual__ containers.
 
-It supports this positioning schemas (the meaning is the same as CSS positions schemas)  
+#### Container
+
+It supports this positioning schemas (the meaning is the same as CSS positions schemas)
 
 +   __absolute positioning__ - position is assigned with respect to its parent (container)
 +   __relative positioning__ - normal flow with support for offset relative to this position - for containers (sections) 
@@ -109,34 +115,57 @@ Content applying offers two rendering modes
 +   __mixed positioning__ - absolute positioning for boxes (widgets) and relative for containers (sections)
 +   __normal flow__ - relative positioning for both - boxes and containers 
 
-The units are pixes and be careful is DPI dependend.
- 
-The default responsive element is __Grid__ and belongs to __responsive__ and __visual__ containers.
+The final dimension and position is determined by the position schema and the style properties (width, height, top, left, transform) of the PTT Node.
 
-It is based on css flexbox - you can add child containers (Cell) as flex box items. 
+#### Grid
+
+It is based on css flexbox - you can add child containers (Cell) as flex box items.
+
+The final dimension and position is determined by [css flexbox](https://github.com/facebook/css-layout) rules and the style properties (width, height, top, left, transform) of the PTT Node.
+
+### Boxes components (widgets)
+
+All boxes components follow the same rendering rules for positioning.
+
+It supports this positioning schemas (the meaning is the same as CSS positions schemas)
+
+ +   __absolute positioning__ - position is assigned with respect to its parent (container)
+ +   __relative positioning__ - normal flow with support for offset relative to this position
+
+For widgets with __static__ container parent - the absolute position is used.
+For widgets with __responsive__ container parent - the relative position is used.
+
+The final dimension and position is determined by the position schema and the style properties (width, height, top, left, transform) of the PTT Node.
 
 ### PTT pages rendering
 
 This section specifies how the page rendering can occur.
 
-Seperate based on different visual media (screen and paper).
+There are two different rendering targets corresponding to two visual media (screen and paper).
 
-The both share container data binding and widgets data binding.
+#### PTT Node rendering
 
-Container data binding steps
+It renders PTT Node according the elementType as specific component based on target format (HTML, PDF, XML, etc.).
+
+Before rendering some specific rules can occur
+
++   data binding to props can be used.
++   style binding to props can be used - typically using some resolution strategy
++   some specific properties can be used - visibility, pageBreaks, unbreakable, startOnNewPage
+
+Example container rendering steps
 +  apply data binding for containers (sections) (visibility, ranges for repeatable containers)
 +  remove invisible containers
-+  expand repeatable containers - cloning row templates
-  
++  expand repeatable containers (RepeaterContainer) - cloning row templates
 
 ### Screen rendering
 
-Screen rendering prefers responsivnes.
+Screen rendering prefers responsiveness.
 
 ### PTT Screen algorithm
 
-+  apply container data binding
-+  traverse PTT and apply container and boxes rendering with applying widgets data binding 
++  apply containers node rendering
++  traverse PTT and apply containers and boxes rendering
 
 ### Paper rendering
 
@@ -152,11 +181,11 @@ Paper rendering requires static elements (absolutely positioning).
 
 Example of algorithm how to render pages from PTT document definition. 
 
-+   apply container data binding
++   apply containers rendering
 +   transform relative positions to absolute positions
 +   reduce to boxes (terminal nodes) - using containers absolute positions (top,height) and its dimensions (with, height)
 +   group to pages - create pages and add boxes to them
-+   for all pages - create page, apply boxes rendering and apply widgets data binding
++   for all pages - create page, apply boxes rendering rendering
 
 
-The proprietary implementation of the algorithm can be found [here](https://github.com/rsamec/react-page-renderer/blob/master/src/utilities/transformToPages.js).
+The example renderer implementation can be found [react-html-pages-renderer](https://github.com/rsamec/react-html-pages-renderer).
