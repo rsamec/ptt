@@ -108,7 +108,7 @@ As an example - data binding suppport for each component and its props can be si
     }]
 }
 ```
-The path __.data.message__ is evaluated before rendering occurs and the value __Hello world" is replaced with the data binding result.
+The binding expression path __data.message__ is evaluated before rendering occurs and the value __Hello world__ is replaced with the data binding result.
 
   
 ## PTT reference usage
@@ -265,9 +265,8 @@ let ContainerRenderer =  (props) => {
 		}
 
 	</div>)
-}	
-
-```js
+}
+```
 
 ### Paper rendering
 
@@ -293,12 +292,12 @@ Example of algorithm how to render pages from PTT document definition.
 function transformToPages(clonedSchema,pageHeight){
 
     const BOXES_COLLECTION_NAME = "boxes";
-   	const CONTAINERS_COLLECTION_NAME = "containers";
+    const CONTAINERS_COLLECTION_NAME = "containers";
     const DEFAULT_PAGE_HEIGHT = 1065;
 	
 
     //step -> transform relative positions to absolute positions
-   	if (pageHeight === undefined) pageHeight = DEFAULT_PAGE_HEIGHT;
+    if (pageHeight === undefined) pageHeight = DEFAULT_PAGE_HEIGHT;
     var globalTop = 0;
     var trav = function(node){
 
@@ -442,6 +441,6 @@ let createBoxedPage = function (page, i) {
 				}, this)}
 			</HtmlPage>)
 		};
-```js
+```
 
 The example html renderer implementation can be found [react-html-pages-renderer](https://github.com/rsamec/react-html-pages-renderer).
