@@ -80,6 +80,37 @@ This is the root node of the PTT document.
 
 PTT is simple JSON. You can extend PTT document with any properties other than specified above.
 
+As an example - data binding suppport for each component and its props can be simple added by extending PTT Node by 
+
++   **bindings** - component bindings - corresponds to component props, each prop can have its own binding exporession
+   
+```json
+{
+ "name": "Hello World Example",
+ "elementName": "PTTv1",
+ "containers": [
+    {
+     "name": "My first container",
+     "elementName": "Container",
+     "style": { "top": 0, "left": 0, "height": 200, "width": 740, "position": "relative" },
+     "boxes": [{
+        "name": "My first text",
+        "elementName": "TextContent",
+        "style": { "top": 0, "left": 0 },
+        "props":{
+            "content": "Hello world"
+            }
+        },
+        bindings":{
+            "content": "data.message"
+            }
+        }]
+    }]
+}
+```
+The path __.data.message__ is evaluated before rendering occurs and the value __Hello world" is replaced with the data binding result.
+
+  
 ## PTT reference usage
 
 The __content applying__ is not the part of the PPT format specification. This section is intended for PTT rendering implementers to guide them when solving layouting and positioning of components.
@@ -94,8 +125,8 @@ Typically we can distinguish containers based on responsivness (adjusting compon
 
 We can distinguish containers based on whatever visual effects provide
 
-+ logical (Container, Page) - has no visual effect
-+ visual - simple layouting only (Row) - only to grouping logically related components
++ logical (Container, Page) - has no visual effect - only to grouping logically related components
++ visual - simple layouting only (Row) - e.g. layout visually as seqeuence
 + visual - other visual effect other than simple layouting as background, border, gutters, etc. (BackgroundContainer, Cell, Grid, Table)
 
 ### Containers components
@@ -167,6 +198,77 @@ Screen rendering prefers responsiveness.
 +  apply containers node rendering
 +  traverse PTT and apply containers and boxes rendering
 
+```js
+let ContainerRenderer =  (props) => {
+
+	var containers = props.containers || [];
+	var boxes = props.boxes || [];
+
+	let {node, widgets} = props;
+	var elementName = node.elementName;
+
+	var styles = {
+		left: props.left,
+		top: props.top,
+		height: props.height,
+		width: props.width,
+		position: props.position || 'relative'
+	};
+
+	var containerComponent = widgets[elementName] || 'div';
+
+	return (<div style={styles}>
+		{containers.length !== 0 ? React.createElement(containerComponent, nodeProps, containers.map(function (container, index) {
+
+			var key = container.name + index;
+
+			var left = container.style.left === undefined ? 0 : parseInt(container.style.left, 10);
+			var top = container.style.top === undefined ? 0 : parseInt(container.style.top, 10);
+
+			var childComponent = widgets[container.elementName] || 'div';
+
+			return (React.createElement(childComponent, _.extend({child: true, key: key}, childProps),
+				<ContainerRenderer key={key}
+								   index={index}
+								   left={left}
+								   top={top}
+								   height={container.style.height}
+								   width={container.style.width}
+								   position={container.style.position || 'relative'}
+								   boxes={container.boxes}
+								   containers={container.containers}
+								   node={container}
+								   parent={props.parent}
+								   widgets={props.widgets}
+								   widgetRenderer={props.widgetRenderer}/>
+			));
+		}, this)) : null}
+
+		{boxes.map(function (box, index) {
+
+			var key = box.name + index;
+
+			var elName = box.elementName;
+			var widget = React.createElement(props.widgetRenderer, {
+				widget: props.widgets[elName],
+				node: box
+			}, null);
+
+			return (
+				<div key={key} style={box.style}>
+					<div id={box.name}>{widget}</div>
+				</div>
+			);
+
+
+		}, this)
+		}
+
+	</div>)
+}	
+
+```js
+
 ### Paper rendering
 
 Paper rendering requires static elements (absolutely positioning).
@@ -187,5 +289,159 @@ Example of algorithm how to render pages from PTT document definition.
 +   group to pages - create pages and add boxes to them
 +   for all pages - create page, apply boxes rendering rendering
 
+```js
+function transformToPages(clonedSchema,pageHeight){
 
-The example renderer implementation can be found [react-html-pages-renderer](https://github.com/rsamec/react-html-pages-renderer).
+    const BOXES_COLLECTION_NAME = "boxes";
+   	const CONTAINERS_COLLECTION_NAME = "containers";
+    const DEFAULT_PAGE_HEIGHT = 1065;
+	
+
+    //step -> transform relative positions to absolute positions
+   	if (pageHeight === undefined) pageHeight = DEFAULT_PAGE_HEIGHT;
+    var globalTop = 0;
+    var trav = function(node){
+
+        if (node === undefined) return 0;
+
+        var props = node.props || {};
+
+        //grap height and top properties
+        var nodeHeight = (node.style === undefined)?0:parseInt(node.style.height, 10);
+        if (isNaN(nodeHeight)) nodeHeight = 0;
+        var nodeTop = (node.style === undefined)?0:parseInt(node.style.top, 10);
+        if (isNaN(nodeTop)) nodeTop = 0;
+
+
+        var children = node.containers || [];
+        var computedHeight = 0;
+        if (children === undefined) return computedHeight;
+        var childrenHeight = 0;
+
+		//unbreakable -> if section is too height to have enough place to fit the the page - move it to the next page
+		var startOnNewPage =  false;
+		if (!!props.unbreakable){
+			var nodeBottom = globalTop + nodeHeight;
+			var nextPageTop = Math.ceil(globalTop/pageHeight) * pageHeight;
+			startOnNewPage = nodeBottom > nextPageTop;
+		}
+
+		//startOnNewPage - move globalTop to the next page
+		if (!!props.startOnNewPage || startOnNewPage) globalTop = Math.ceil(globalTop/pageHeight) * pageHeight;
+
+
+        //set absolute top property - use last global top + node top (container can have top != 0)
+        if (node.style !== undefined) node.style.top = globalTop + nodeTop;
+
+        //recurse by all its children containers
+        for (var i in children)
+        {
+            childrenHeight += trav(children[i]);
+        }
+
+        //expand container height if childrenHeight is greater than node height - typically for repeated containers
+        computedHeight = _.max([nodeHeight,childrenHeight]) +  nodeTop;
+
+        //compute next top
+        globalTop += (computedHeight-childrenHeight);
+        
+		//return computed height of container
+        return computedHeight;
+    };
+    trav(clonedSchema);
+
+
+	traverse(clonedSchema).reduce(function (occ,x) {
+
+		if (this.key === CONTAINERS_COLLECTION_NAME) {
+			for (var i in x) {
+				var el = x[i];
+			}
+		}
+	});
+	
+
+	//step -> reduce to boxes - using containers absolute positions (top,height) and its dimensions (with, height)
+    //step -> create pages and add boxes to them
+    var pages = [];
+    var currentPage;
+    traverse(clonedSchema).reduce(function (occ,x) {
+
+		
+        if (this.key === BOXES_COLLECTION_NAME){
+            var parent = this.parent.node;
+            for (var i in x){
+                var el = x[i];
+			
+				var elTop = el.style.top && parseInt(el.style.top,10) || 0;
+				var elLeft = el.style.left && parseInt(el.style.left,10) || 0;
+
+				var parentStyle = parent.style || {};
+                //grab parent positions
+                var top = (parentStyle.top && parseInt(parentStyle.top,10) || 0) + elTop;
+                var left = (parentStyle.left && parseInt(parentStyle.left,10) || 0) + elLeft;
+
+                //grab parent dimensions
+                //TODO: !!!! temporarily - container width simulates boxes width
+                var height = (parentStyle.height && parseInt(parentStyle.height, 10) || 0) - elTop;
+                var width = (parentStyle.width && parseInt(parentStyle.width, 10) || 0) - elLeft;
+                //var height = parseInt(el.style.height,10);
+                //var width = parseInt(el.style.width,10);
+                if (isNaN(height)) height = 0;
+                if (isNaN(width)) width = 0;
+
+
+                //create newPage
+                if (currentPage === undefined || (top + height) > pageHeight * pages.length){
+                    var newPage ={pageNumber:pages.length + 1,boxes:[]};
+                    pages.push(newPage);
+                    currentPage = newPage;
+                }
+
+                //decrease top according the pages
+                if (pages.length > 1){ top -= (pages.length -1) * pageHeight };
+
+                var style = {'left':left,'top':top,'position':'absolute'};
+                if (el.style.width!== undefined) style.width = el.style.width;
+                if (el.style.height!== undefined) style.height = el.style.height;
+                if (el.style.zIndex!== undefined) style.zIndex = el.style.zIndex;
+
+                //propagate width and height to widget props
+                if (!el.props.width && !!el.style.width) el.props.width = el.style.width;
+                if (!el.props.height&& !!el.style.height) el.props.height = el.style.height;
+
+                if (el.style.transform !== undefined) {
+                    style.WebkitTransform = generateCssTransform(el.style.transform);
+                    style.transform = generateCssTransform(el.style.transform);
+                }
+                // set another box
+                currentPage.boxes.push({element:x[i],style:style});
+            }
+        }
+        return occ;
+    }, pages);
+
+    return pages;
+};
+
+
+let createBoxedPage = function (page, i) {
+			var back = normalizeBackgrounds[i];
+			return (<HtmlPage key={'page' + i} position={i} pageNumber={page.pageNumber} widgets={widgets}
+							  background={back} pageOptions={pageOptions}>
+				{page.boxes.map(function (node, j) {
+					var elName = node.element.elementName;
+					var widget = <WidgetRenderer key={'page' + i + '_' + j} widget={widgets[elName]}
+												 node={node.element}
+												 customStyle={customStyles[elName]} dataBinder={dataContext}/>;
+					return (
+						<div key={'item' + j} style={ node.style}>
+							<div id={node.element.name}>{widget}</div>
+						</div>
+					);
+				}, this)}
+			</HtmlPage>)
+		};
+```js
+
+The example html renderer implementation can be found [react-html-pages-renderer](https://github.com/rsamec/react-html-pages-renderer).
